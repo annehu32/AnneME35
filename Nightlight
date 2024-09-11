@@ -1,0 +1,96 @@
+import time
+import random
+import neopixel
+import network
+import sys
+import uasyncio as asyncio
+from mqtt import MQTTClient
+from machine import Pin, PWM
+
+
+# all flag information is in the class
+# in other file, have 3 events running: MQTT, breathing is high/not, button state
+# all you want to do in callbacks is set flags, async is checking those flags to act accordingly
+
+NOTES = {
+        'C4': 261, 'D4': 293, 'E4': 329, 'F4': 349,
+        'G4': 392, 'A4': 440, 'B4': 493, 'C5': 523
+        }
+
+melody = [
+    ('C4', 0.5), ('C4', 0.5), ('G4', 0.5), ('G4', 0.5),
+    ('A4', 0.5), ('A4', 0.5), ('G4', 1.0),
+    ('F4', 0.5), ('F4', 0.5), ('E4', 0.5), ('E4', 0.5),
+    ('D4', 0.5), ('D4', 0.5), ('C4', 1.0)
+]
+
+class Nightlight():
+
+    # Initializer takes arguments GPIO objects for the LED, buzzer, neopixel and button
+    def __init__(self, blueLED, buzzer, neo, button):
+        self.backup = 'backup'
+        self.blueLED = blueLED
+        self.buzzer = buzzer
+        self.neo = neo
+        self.button = button
+        self.IS_ON = False
+        print('------ Nightlight initialized -------')
+
+    def turnOn(self):
+        self.IS_ON = True
+        print('------- Nightlight turned on -------')
+
+    def turnOff(self):
+        self.IS_ON = False
+        self.buzzer.duty_u16(0)
+        self.blueLED.duty_u16(0)
+        print('------- Nightlight turned off -------')
+
+    # Asyncio function for blue LED to breathe
+    async def breathe(self):
+        for i in range(0, 65535, 500):
+            self.blueLED.duty_u16(i)
+            await asyncio.sleep(0.001)
+        for i in range(65535, 0, -500):
+            self.blueLED.duty_u16(i)
+            await asyncio.sleep(0.001)
+        print('----- Breathing --------')
+    
+    # Asyncio function to lightup Neopixel with random color
+    async def changeNeopixel(self):
+        r = random.randint(0, 255)
+        g = random.randint(0, 255)
+        b = random.randint(0, 255)
+
+        self.neo[0] = (r, g, b)
+        self.neo.write()
+        await asyncio.sleep(2)  # neopixel on for 2 seconds
+        self.neo[0] = (0, 0, 0)
+        self.neo.write()
+    
+
+    # Asyncio function to have buzzer play song
+    async def singSong(self):
+        for note, duration in melody:
+            frequency = NOTES[note]
+            self.buzzer.freq(frequency)
+            self.buzzer.duty_u16(700)
+            await asyncio.sleep(duration)
+            self.buzzer.duty_u16(0)
+            await asyncio.sleep(0.01)
+
+    # Button callback
+    def readButtonPress(self,p):
+        print("Button press detected, triggering actions")
+        asyncio.create_task(self.changeNeopixel())
+        asyncio.create_task(self.singSong())
+    
+    # Setting a callback for the button
+    async def handle_button(self):
+        print('-----handle_button called -------')
+        self.button.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self.readButtonPress)
+
+    # Helper function to turn the buzzer and breathing light off.
+    def reset(self):
+        self.buzzer.duty_u16(0)
+        self.blueLED.duty_u16(0)
