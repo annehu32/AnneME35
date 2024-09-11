@@ -1,0 +1,77 @@
+import time
+import random
+import neopixel
+import network
+import sys
+import uasyncio as asyncio
+from mqtt import MQTTClient
+from machine import Pin, PWM
+from Nightlight import Nightlight
+import gc
+
+ssid = 'Tufts_Robot'
+password = ''
+
+# ---- setting up pins ----
+blueLED = PWM(Pin('GPIO0', Pin.OUT))  # Breathing LED
+blueLED.freq(50)
+buzzer = PWM(Pin('GPIO18', Pin.OUT))  # buzzer
+neo = neopixel.NeoPixel(Pin(28), 1)   # neopixel
+button = Pin('GPIO20', Pin.IN, Pin.PULL_UP)  # button
+
+# --- creating a Nightlight instance using pins ---
+myNightlight = Nightlight(blueLED, buzzer, neo, button)
+
+# helper function to connect to wifi
+# TODO: generally don't want this to be non-blocking, make a file with function!!! main.py???
+async def connect_wifi():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    wlan.connect(ssid, password)
+    while not wlan.isconnected():
+        await asyncio.sleep(1)
+    print('Connected to wifi')
+
+# --- MQTT ---
+mqtt_broker = 'broker.hivemq.com'
+port = 1883
+topic_sub = 'nightlightSA'
+
+def callback(topic, msg):
+    print((topic.decode(), msg.decode()))
+    if msg.decode() == 'start':
+        myNightlight.IS_ON = True
+        print('START!!!')
+    elif msg.decode() == 'stop':
+        myNightlight.turnOff()
+        print('STOP!!!')
+
+async def mqtt_handler(client):
+    while True:
+        client.check_msg()
+        await asyncio.sleep(0.1)
+
+async def main_loop():
+    await connect_wifi()
+    gc.collect()
+    client = MQTTClient('ME35_chris', mqtt_broker, port, keepalive=60)
+    client.set_callback(callback)
+    client.connect()
+    client.subscribe(topic_sub.encode())
+    print(f'Subscribed to {topic_sub}')
+
+    asyncio.create_task(mqtt_handler(client))
+
+    while True:
+        if myNightlight.IS_ON:
+            print("Start command active")
+            await myNightlight.breathe()
+            await myNightlight.handle_button()
+        else:
+            print("Waiting for start command...")
+        await asyncio.sleep(1)
+
+try:
+    asyncio.run(main_loop())
+except KeyboardInterrupt:
+    print("Exiting...")
