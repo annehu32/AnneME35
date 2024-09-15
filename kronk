@@ -1,11 +1,12 @@
 import uasyncio as asyncio
+from machine import I2C, Pin, PWM
 import neopixel
+from Button import Button
+from Acceleration import Acceleration
+
 import struct
 import time
 import math
-from Acceleration import Acceleration
-from Button import Button
-from machine import I2C, Pin, PWM
 
 # Defining pins
 scl = Pin('GPIO27', Pin.OUT)
@@ -15,17 +16,13 @@ redLight = Pin('GPIO0', Pin.OUT)
 greenLight = Pin('GPIO1', Pin.OUT)
 yellowLight = Pin('GPIO2',Pin.OUT)
 
-input = Pin('GPIO8', Pin.IN) # external button
+extButton = Pin('GPIO8', Pin.IN) # external button
 buzzer = PWM(Pin('GPIO18', Pin.OUT))  # buzzer
 neo = neopixel.NeoPixel(Pin(28), 1)   # neopixel
 
 # Creating accelerometer and button instances
 acc = Acceleration(scl, sda, greenLight)
-button = Button(input, neo, buzzer)
-
-#async def mainLoop():
-    #asyncio.create_task(button.readPress())
-    # asyncio.create_task(acc.read_event()) #still need to make acc into an async hting
+button = Button(extButton, neo, buzzer)
 
 # The main code
 loop = asyncio.get_event_loop()
