@@ -1,0 +1,68 @@
+from machine import I2C, Pin, PWM
+import time
+import math
+import uasyncio as asyncio
+import random
+import neopixel
+
+# Defining notes and melody for the buzzer to play songs
+NOTES = {
+        'C4': 261, 'D4': 293, 'E4': 329, 'F4': 349,
+        'G4': 392, 'A4': 440, 'B4': 493, 'C5': 523
+        }
+
+melody = [
+    ('C4', 0.5), ('C4', 0.5), ('G4', 0.5), ('G4', 0.5),
+    ('A4', 0.5), ('A4', 0.5), ('G4', 1.0),
+    ('F4', 0.5), ('F4', 0.5), ('E4', 0.5), ('E4', 0.5),
+    ('D4', 0.5), ('D4', 0.5), ('C4', 1.0)
+    ]
+
+class Button():
+
+    # Initializer takes pins for the neopixel and buzzer
+    def __init__(self, pin, neopixel, buzzer):
+        self.pin = pin
+        self.ON = False #flag for whether the button is in the "ON" state
+        self.neo = neopixel
+        self.buzzer = buzzer
+
+    
+    
+    # If a button is pressed, readPress What happens when the "pressed" boolean is true
+    async def toggleButton(self):
+        if self.ON:
+            self.ON = False
+            self.neo[0] = (0,0,0)
+            self.neo.write()
+
+        else:
+            self.ON = True
+            self.neo[0] = (25,50,100)
+            self.neo.write()
+        await asyncio.sleep(0.01)
+    
+    # Asyncio function to watch for button press and update "pressed"
+    async def readPress(self):
+        print('-----handle_button called -------')
+        if self.pin.value()== 1:
+            print('----- IN button.readPress: Button Pressed! -----')
+             self.toggleButon()
+        await asyncio.sleep(0.01)
+    
+ #   Asyncio function to have buzzer play song
+    async def singSong(self):
+        for note, duration in melody:
+            frequency = NOTES[note]
+            self.buzzer.freq(frequency)
+            self.buzzer.duty_u16(700)
+            await asyncio.sleep(duration)
+            self.buzzer.duty_u16(0)
+            await asyncio.sleep(0.01)
+
+
+    # IN PROGRESS:  Asyncio function for a button press
+    async def buttonEvent(self):
+        await asyncio.sleep(0.01)
+        if self.ON:
+            await self.singSong()
