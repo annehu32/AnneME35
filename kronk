@@ -16,13 +16,13 @@ redLight = Pin('GPIO0', Pin.OUT)
 greenLight = Pin('GPIO1', Pin.OUT)
 yellowLight = Pin('GPIO2',Pin.OUT)
 
-extButton = Pin('GPIO8', Pin.IN) # external button
+extButton = Pin('GPIO9', Pin.IN, Pin.PULL_UP) # external button
 buzzer = PWM(Pin('GPIO18', Pin.OUT))  # buzzer
 neo = neopixel.NeoPixel(Pin(28), 1)   # neopixel
 
 # Creating accelerometer and button instances
 acc = Acceleration(scl, sda, greenLight)
-button = Button(extButton, neo, buzzer)
+button = Button(extButton, redLight, buzzer)
 
 # The main code
 loop = asyncio.get_event_loop()
