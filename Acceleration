@@ -1,19 +1,29 @@
-from machine import I2C, Pin
+from machine import I2C, Pin, PWM
 import uasyncio as asyncio
 import struct
 import math
 
 class Acceleration():
-    def __init__(self, scl, sda, indicatorPin, addr = 0x62):
+    def __init__(self, scl, sda, indicatorPin, buzzer, addr = 0x62):
         self.addr = addr
         self.i2c = I2C(1,scl=scl, sda=sda, freq=100000) 
         self.connected = False
+        self.isOn = False
+        self.buzzer = buzzer
         if self.is_connected():
             print('connected')
             asyncio.create_task(self.write_byte(0x11,2)) #start data stream
         self.isTap = False # tap flag
         self.indicator = indicatorPin
 
+    def turnOn(self):
+        self.isOn = True
+        print('ACCELERATION ON')
+
+    def turnOff(self):
+        self.isOn = False
+
+        
     def is_connected(self):
         options = self.i2c.scan() 
         print(options)
@@ -28,24 +38,38 @@ class Acceleration():
     async def write_byte(self, cmd, value):
         self.i2c.writeto_mem(self.addr, cmd, value.to_bytes(1,'little'))
 
+    async def beep(self):
+        print('--- buzz function called ---')
+        self.buzzer.freq(440)
+        self.buzzer.duty_u16(1000)
+        await asyncio.sleep(0.3)
+        self.buzzer.duty_u16(0)
+        
     # IN PROGRESS: function to detect accelerometer event
-    TAP_THRESHOLD = 18000
+    TAP_THRESHOLD = 35000
     async def read_event(self):
         print('-------ACCEL.READ_EVENT CALLED-----')
         while True:
-            try:
-                data = await self.read_accel()
-                mag = math.sqrt(data[0]**2 + data[1]**2 + data[2]**2)
-                await asyncio.sleep(0.01)
-            
-                if mag > self.TAP_THRESHOLD:
-                    print(mag)
-                    self.isTap = True
-                    self.indicator.on()
-                    await asyncio.sleep(0.05)
-                    self.indicator.off()
-            except Exception as e:
-                print(f"Error in read_event: {e}")
+            if self.isOn:
+                try:
+                    data = await self.read_accel()
+                    mag = math.sqrt(data[0]**2 + data[1]**2 + data[2]**2)
+                    await asyncio.sleep(0.01)
+                
+                    if mag > self.TAP_THRESHOLD:
+                        print(mag)
+                        self.buzzer.freq(440)
+                        self.buzzer.duty_u16(1000)
+                        await asyncio.sleep(0.3)
+                        self.buzzer.duty_u16(0)
+                        print('AFTER BEEP')
+                        self.isTap = True
+                        self.indicator.on()
+                        await asyncio.sleep(0.05)
+                        self.indicator.off()
+                        
+                except Exception as e:
+                    print(f"Error in read_event: {e}")
             await asyncio.sleep(0.1)
 
 # scl = Pin('GPIO27', Pin.OUT)
