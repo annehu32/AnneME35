@@ -26,7 +26,14 @@ class Button():
         self.led = led
         self.buzzer = buzzer
         self.state = 1
+        self.isOn = False
 
+    def turnOn(self):
+        self.isOn = True
+        print('BUTTON ON')
+
+    def turnOff(self):
+        self.isOn = False
     
     # If a button is pressed, readPress What happens when the "pressed" boolean is true
     async def toggleButton(self):
@@ -46,10 +53,11 @@ class Button():
     async def readPress(self):
         print('-----handle_button called -------')
         while True:
-            if self.pin.value() != self.state:
-                time.sleep(0.1)
+            if self.isOn:
                 if self.pin.value() != self.state:
-                    await self.toggleButton()
+                    time.sleep(0.1)
+                    if self.pin.value() != self.state:
+                        await self.toggleButton()
             await asyncio.sleep(0.01)
     
  #   Asyncio function to have buzzer play song
@@ -63,7 +71,7 @@ class Button():
             await asyncio.sleep(0.01)
 
 
-    # IN PROGRESS:  Asyncio function for a button press
+# IN PROGRESS:  Asyncio function for a button press
     async def buttonEvent(self):
         await asyncio.sleep(0.01)
         if self.ON:
