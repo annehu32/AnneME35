@@ -4,9 +4,34 @@ import neopixel
 from Button import Button
 from Acceleration import Acceleration
 
+import network
+from mqtt import MQTTClient
+ssid = 'Tufts_Robot'
+password = ''
+
 import struct
 import time
 import math
+
+def connect_wifi():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    wlan.connect(ssid, password)
+    while not wlan.isconnected():
+        time.sleep(1)
+    print('Connected to wifi')
+
+def callback(topic, msg):
+    print((topic.decode(), msg.decode()))
+    if msg.decode() == 'start':
+        print('START!!!')
+    elif msg.decode() == 'stop':
+        print('STOP!!!')
+
+async def mqtt_handler(client):
+    while True:
+        client.check_msg()
+        await asyncio.sleep(0.1)
 
 # Defining pins
 scl = Pin('GPIO27', Pin.OUT)
@@ -21,12 +46,27 @@ buzzer = PWM(Pin('GPIO18', Pin.OUT))  # buzzer
 neo = neopixel.NeoPixel(Pin(28), 1)   # neopixel
 
 # Creating accelerometer and button instances
-acc = Acceleration(scl, sda, greenLight)
+acc = Acceleration(scl, sda, greenLight, buzzer)
 button = Button(extButton, redLight, buzzer)
 
+# --- MQTT ---
+mqtt_broker = 'broker.hivemq.com'
+port = 1883
+topic_sub = 'ME35-24/kronk'
+
 # The main code
+connect_wifi()
 loop = asyncio.get_event_loop()
 print('loop created')
+
+client = MQTTClient('ME35_chris', mqtt_broker, port, keepalive=60)
+client.set_callback(callback)
+client.connect()
+client.subscribe(topic_sub.encode())
+print(f'Subscribed to {topic_sub}')
+asyncio.create_task(mqtt_handler(client))
+
+
 loop.create_task(button.readPress())
 loop.create_task(acc.read_event())
 loop.run_forever()
